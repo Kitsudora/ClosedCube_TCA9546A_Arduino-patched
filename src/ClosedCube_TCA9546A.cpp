@@ -79,5 +79,5 @@ uint8_t ClosedCube_TCA9546A::nextChannel() {
 	if (nextChannel > 3)
 		nextChannel = 0;
 
-	selectChannel(nextChannel);
+	return selectChannel(nextChannel);
 }
