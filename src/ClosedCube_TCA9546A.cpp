@@ -32,19 +32,49 @@ THE SOFTWARE.
 
 #include "ClosedCube_TCA9546A.h"
 
+namespace {
+
+constexpr uint8_t kInvalidChannel = 0xFF;
+constexpr uint8_t kControlMask = 0x0F;
+
+uint8_t controlRegisterToChannel(const uint8_t controlRegister) {
+	switch (controlRegister & kControlMask) {
+	case 0x01:
+		return 0;
+	case 0x02:
+		return 1;
+	case 0x04:
+		return 2;
+	case 0x08:
+		return 3;
+	default:
+		return kInvalidChannel;
+	}
+}
+
+} // namespace
 
 ClosedCube_TCA9546A::ClosedCube_TCA9546A() {
 }
 
 void ClosedCube_TCA9546A::begin(uint8_t address) {
 	_address = address;
-	Wire.begin();
-
 	selectChannel(0);
 }
 
 uint8_t ClosedCube_TCA9546A::getChannel() {
-	return _currentChannel;
+	if (Wire.requestFrom(_address, static_cast<uint8_t>(1)) != 1) {
+		return kInvalidChannel;
+	}
+	if (!Wire.available()) {
+		return kInvalidChannel;
+	}
+
+	const uint8_t channel = controlRegisterToChannel(static_cast<uint8_t>(Wire.read()));
+	if (channel != kInvalidChannel) {
+		_currentChannel = channel;
+	}
+	return channel;
 }
 
 uint8_t ClosedCube_TCA9546A::selectChannel(uint8_t channel) {
@@ -65,8 +95,11 @@ uint8_t ClosedCube_TCA9546A::selectChannel(uint8_t channel) {
 			Wire.write(0x08);
 			break;
 		}
-		_currentChannel = channel;
-		return Wire.endTransmission();
+		const uint8_t status = Wire.endTransmission();
+		if (status == 0) {
+			_currentChannel = channel;
+		}
+		return status;
 	}
 	else {
 		return 0xff;
@@ -75,7 +108,12 @@ uint8_t ClosedCube_TCA9546A::selectChannel(uint8_t channel) {
 
 
 uint8_t ClosedCube_TCA9546A::nextChannel() {
-	uint8_t nextChannel = _currentChannel + 1;
+	uint8_t currentChannel = getChannel();
+	if (currentChannel > 3) {
+		currentChannel = 0;
+	}
+
+	uint8_t nextChannel = currentChannel + 1;
 	if (nextChannel > 3)
 		nextChannel = 0;
 
